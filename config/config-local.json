@@ -1,0 +1,5 @@
+{
+  "PRODUCT_TABLE": "products-local",
+  "ORDERS_TABLE": "taller-gateway-local-orders",
+  "CORS_ORIGIN": "*"
+}

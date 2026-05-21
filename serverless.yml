@@ -1,0 +1,361 @@
+service: taller-gateway
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: ${opt:stage, 'local'}
+  region: us-east-1
+  environment:
+    USERS_TABLE: taller-gateway-${self:provider.stage}-users
+    REFRESH_TOKENS_TABLE: taller-gateway-${self:provider.stage}-refresh-tokens
+    PRODUCT_TABLE: ${file(config/config-${self:provider.stage}.json):PRODUCT_TABLE}
+    ORDERS_TABLE: ${file(config/config-${self:provider.stage}.json):ORDERS_TABLE}
+    STAGE: ${self:provider.stage}
+    CORS_ORIGIN: ${file(config/config-${self:provider.stage}.json):CORS_ORIGIN}
+    CORS_ORIGINS: ${file(config/config-${self:provider.stage}.json):CORS_ORIGIN}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - lambda:InvokeFunction
+          Resource:
+            - arn:aws:lambda:${aws:region}:${aws:accountId}:function:taller-gateway-${self:provider.stage}-*
+
+plugins:
+  - serverless-localstack
+
+custom:
+  localstack:
+    stages:
+      - local
+    host: http://localhost
+    edgePort: 4566
+
+functions:
+  authorizer:
+    handler: dist/handlers/authorizer.authorizer
+
+  ping:
+    handler: dist/handlers/ping.handler
+    events:
+      - http:
+          path: ping
+          method: get
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  register:
+    handler: dist/handlers/register.handler
+    name: taller-gateway-${self:provider.stage}-register
+    events:
+      - http:
+          path: users/register
+          method: post
+          cors: true
+
+  login:
+    handler: dist/handlers/login.handler
+    name: taller-gateway-${self:provider.stage}-login
+    events:
+      - http:
+          path: users/login
+          method: post
+          cors: true
+
+  getUser:
+    handler: dist/handlers/getUser.handler
+    name: taller-gateway-${self:provider.stage}-getUser
+    events:
+      - http:
+          path: users/profile
+          method: get
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  updateUser:
+    handler: dist/handlers/updateUser.handler
+    name: taller-gateway-${self:provider.stage}-updateUser
+    events:
+      - http:
+          path: users/profile
+          method: put
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  deleteUser:
+    handler: dist/handlers/deleteUser.handler
+    name: taller-gateway-${self:provider.stage}-deleteUser
+    events:
+      - http:
+          path: users/profile
+          method: delete
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  createProduct:
+    handler: dist/handlers/createProduct.handler
+    name: taller-gateway-${self:provider.stage}-createProduct
+    events:
+      - http:
+          path: products
+          method: post
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getProduct:
+    handler: dist/handlers/getProduct.handler
+    name: taller-gateway-${self:provider.stage}-getProduct
+    events:
+      - http:
+          path: products/{id}
+          method: get
+          cors: true
+
+  updateProduct:
+    handler: dist/handlers/updateProduct.handler
+    name: taller-gateway-${self:provider.stage}-updateProduct
+    events:
+      - http:
+          path: products/{id}
+          method: put
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  deleteProduct:
+    handler: dist/handlers/deleteProduct.handler
+    name: taller-gateway-${self:provider.stage}-deleteProduct
+    events:
+      - http:
+          path: products/{id}
+          method: delete
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  listAllProducts:
+    handler: dist/handlers/listAllProducts.handler
+    name: taller-gateway-${self:provider.stage}-listAllProducts
+    events:
+      - http:
+          path: products
+          method: get
+          cors: true
+
+  listProductsBySeller:
+    handler: dist/handlers/listProductsBySeller.handler
+    name: taller-gateway-${self:provider.stage}-listProductsBySeller
+    events:
+      - http:
+          path: products/seller/{sellerId}
+          method: get
+          cors: true
+
+  updateStock:
+    handler: dist/handlers/updateStock.handler
+    name: taller-gateway-${self:provider.stage}-updateStock
+    events:
+      - http:
+          path: products/{id}/stock
+          method: patch
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  createOrder:
+    handler: dist/handlers/createOrder.handler
+    name: taller-gateway-${self:provider.stage}-createOrder
+    events:
+      - http:
+          path: orders/create
+          method: post
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  getOrder:
+    handler: dist/handlers/getOrder.handler
+    name: taller-gateway-${self:provider.stage}-getOrder
+    events:
+      - http:
+          path: orders/{id}
+          method: get
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  listOrdersByUserId:
+    handler: dist/handlers/listOrdersByUserId.handler
+    name: taller-gateway-${self:provider.stage}-listOrdersByUserId
+    events:
+      - http:
+          path: orders/list/users/{userId}
+          method: get
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  confirmOrder:
+    handler: dist/handlers/confirmOrder.handler
+    name: taller-gateway-${self:provider.stage}-confirmOrder
+    events:
+      - http:
+          path: orders/{id}/confirm
+          method: post
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+  cancelOrder:
+    handler: dist/handlers/cancelOrder.handler
+    name: taller-gateway-${self:provider.stage}-cancelOrder
+    events:
+      - http:
+          path: orders/{id}/cancel
+          method: post
+          cors: true
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: token
+
+resources:
+  Resources:
+    usersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: taller-gateway-${self:provider.stage}-users
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: email-index
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+    refreshTokensTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: taller-gateway-${self:provider.stage}-refresh-tokens
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: token
+            AttributeType: S
+        KeySchema:
+          - AttributeName: token
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: expiresAt
+          Enabled: true
+
+    productsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.PRODUCT_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: productId
+            AttributeType: S
+          - AttributeName: sellerId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: productId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: seller-index
+            KeySchema:
+              - AttributeName: sellerId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+    ordersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.ORDERS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: orderId
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: orderId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: user-orders-index
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+  Outputs:
+    MainRestApiId:
+      Value: !Ref ApiGatewayRestApi
+      Export:
+        Name: taller-gateway-${self:provider.stage}-RestApiId
+    MainRestApiRootResourceId:
+      Value: !GetAtt ApiGatewayRestApi.RootResourceId
+      Export:
+        Name: taller-gateway-${self:provider.stage}-RootResourceId
