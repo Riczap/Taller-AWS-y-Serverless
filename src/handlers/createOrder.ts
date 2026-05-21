@@ -2,7 +2,7 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 import { dynamodb } from '../lib/dynamodb';
-import { invokeProductLambda } from '../lib/lambdaInvoke';
+import { invokeProductLambda, invokeNotificationLambda } from '../lib/lambdaInvoke';
 import { ok, badRequest, internalServerError, created } from '../lib/response';
 import { Order, OrderItem } from '../types/order';
 import { withCors } from '../common/cors';
@@ -121,6 +121,20 @@ const baseHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxy
                 const errorMsg = updateStockResult.body?.message || "Stock update failed";
                 return internalServerError(`Stock update failed for product ${item.productId}: ${errorMsg}. Order cancelled.`);
             }
+        }
+
+        // 4. Notify purchase asynchronously
+        try {
+            await invokeNotificationLambda("notifyPurchase", {
+                body: JSON.stringify({
+                    userId,
+                    orderId,
+                    total
+                })
+            });
+        } catch (err) {
+            console.error("Failed to invoke notifyPurchase lambda:", err);
+            // We do not fail the order creation if notification fails, just log it.
         }
 
         return created({

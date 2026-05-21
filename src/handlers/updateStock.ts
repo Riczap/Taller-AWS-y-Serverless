@@ -3,6 +3,7 @@ import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { dynamodb } from '../lib/dynamodb';
 import { ok, badRequest, notFound, forbidden, internalServerError } from '../lib/response';
 import { withCors } from '../common/cors';
+import { invokeNotificationLambda } from '../lib/lambdaInvoke';
 
 const baseHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     try {
@@ -56,9 +57,24 @@ const baseHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxy
                 ReturnValues: "ALL_NEW"
             }));
 
+            const updatedProduct = result.Attributes;
+            if (updatedProduct && updatedProduct.stock === 0) {
+                try {
+                    await invokeNotificationLambda("stockAlert", {
+                        body: JSON.stringify({
+                            productId: updatedProduct.productId,
+                            productName: updatedProduct.name,
+                            sellerId: updatedProduct.sellerId
+                        })
+                    });
+                } catch (err) {
+                    console.error("Failed to invoke stockAlert lambda:", err);
+                }
+            }
+
             return ok({
                 message: "Stock updated successfully",
-                data: result.Attributes
+                data: updatedProduct
             });
 
         } catch (error: any) {

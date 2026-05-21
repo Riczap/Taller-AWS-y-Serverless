@@ -63,3 +63,14 @@ export const invokeProductLambda = async (name: string, payload: any): Promise<L
     const targetFunctionName = productsFn(name);
     return await invokeLambda(targetFunctionName, payload);
 };
+
+// Notifications Lambda Helper
+export const notificationsFn = (name: string): string => {
+    return `taller-notifications-${stage}-${name}`;
+};
+
+// Directly invoke a notification Lambda using the naming helper
+export const invokeNotificationLambda = async (name: string, payload: any): Promise<LambdaInvokeResult> => {
+    const targetFunctionName = notificationsFn(name);
+    return await invokeLambda(targetFunctionName, payload);
+};
